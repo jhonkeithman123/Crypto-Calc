@@ -6,8 +6,8 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch all files in the workspace
-config.watchFolders = [workspaceRoot];
+// Watch all files in the workspace alongside defaults
+config.watchFolders = [...(config.watchFolders || []), workspaceRoot];
 
 // Resolve modules from workspace root first, then project root
 config.resolver.nodeModulesPaths = [
