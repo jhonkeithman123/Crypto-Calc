@@ -1,137 +1,14 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-// ─── Math ────────────────────────────────────────────────────────────
-function gcd(a: number, b: number): number {
-  a = Math.abs(Math.floor(a)); b = Math.abs(Math.floor(b));
-  return b === 0 ? a : gcd(b, a % b);
-}
-function modInv(a: number, m: number): number | null {
-  a = ((Math.floor(a) % m) + m) % m;
-  if (a === 0) return null;
-  let [or, r] = [a, m], [os, s] = [1, 0];
-  while (r !== 0) {
-    const q = Math.floor(or / r);
-    [or, r] = [r, or - q * r];
-    [os, s] = [s, os - q * s];
-  }
-  return or === 1 ? ((os % m) + m) % m : null;
-}
-function modPow(base: number, exp: number, mod: number): number {
-  if (mod === 1) return 0;
-  base = ((Math.floor(base) % mod) + mod) % mod;
-  exp = Math.max(0, Math.floor(exp));
-  let result = 1;
-  while (exp > 0) {
-    if (exp & 1) result = (result * base) % mod;
-    base = (base * base) % mod;
-    exp >>= 1;
-  }
-  return result;
-}
-
-// ─── Tokeniser / Parser ──────────────────────────────────────────────
-type TT = "num" | "op" | "fn" | "lp" | "rp" | "comma";
-interface Tok { t: TT; v: string }
-
-function tokenize(raw: string): Tok[] {
-  const s = raw.replace(/×/g,"*").replace(/÷/g,"/").replace(/[−\u2212]/g,"-").trim();
-  const out: Tok[] = [];
-  let i = 0;
-  while (i < s.length) {
-    const c = s[i];
-    if (c === " ") { i++; continue; }
-    if (/\d/.test(c)) { let n=""; while(i<s.length&&/\d/.test(s[i])) n+=s[i++]; out.push({t:"num",v:n}); continue; }
-    if (/[a-zA-Z]/.test(c)) { let w=""; while(i<s.length&&/[a-zA-Z]/.test(s[i])) w+=s[i++]; out.push(w==="mod"?{t:"op",v:"mod"}:{t:"fn",v:w.toLowerCase()}); continue; }
-    if (c==="(") { out.push({t:"lp",v:"("}); i++; continue; }
-    if (c===")") { out.push({t:"rp",v:")"}); i++; continue; }
-    if (c===",") { out.push({t:"comma",v:","}); i++; continue; }
-    if ("+-*/^".includes(c)) { out.push({t:"op",v:c}); i++; continue; }
-    i++;
-  }
-  return out;
-}
-
-class Parser {
-  pos=0;
-  constructor(private toks: Tok[], private T: number){}
-  private pk(): Tok|null { return this.toks[this.pos]??null; }
-  private nx(): Tok { const t=this.toks[this.pos++]; if(!t) throw new Error("Unexpected end"); return t; }
-  private ex(t:TT,v?:string): Tok { const tok=this.nx(); if(tok.t!==t||(v&&tok.v!==v)) throw new Error(`Expected ${v??t} got '${tok.v}'`); return tok; }
-
-  parse(): number {
-    if(!this.toks.length) throw new Error("Empty expression");
-    const v=this.addSub();
-    if(this.pos<this.toks.length) throw new Error(`Unexpected '${this.toks[this.pos].v}'`);
-    return ((Math.floor(v)%this.T)+this.T)%this.T;
-  }
-  addSub(): number {
-    let l=this.mulDiv();
-    while(this.pk()?.t==="op"&&(this.pk()!.v==="+"||this.pk()!.v==="-")){
-      const op=this.nx().v, r=this.mulDiv();
-      l=op==="+"?((l+r)%this.T+this.T)%this.T:((l-r)%this.T+this.T)%this.T;
-    }
-    return l;
-  }
-  mulDiv(): number {
-    let l=this.modOp();
-    while(this.pk()?.t==="op"&&(this.pk()!.v==="*"||this.pk()!.v==="/")){
-      const op=this.nx().v, r=this.modOp();
-      if(op==="*"){ l=(l*r)%this.T; }
-      else { const inv=modInv(r,this.T); if(inv===null) throw new Error(`${r}⁻¹ mod ${this.T} undefined (gcd=${gcd(r,this.T)})`); l=(l*inv)%this.T; }
-    }
-    return l;
-  }
-  modOp(): number {
-    let l=this.pow();
-    while(this.pk()?.t==="op"&&this.pk()!.v==="mod"){
-      this.nx(); const r=this.pow();
-      if(r===0) throw new Error("mod 0 undefined");
-      l=((Math.floor(l)%r)+r)%r;
-    }
-    return l;
-  }
-  pow(): number {
-    let b=this.unary();
-    if(this.pk()?.t==="op"&&this.pk()!.v==="^"){ this.nx(); b=modPow(b,this.pow(),this.T); }
-    return b;
-  }
-  unary(): number {
-    if(this.pk()?.t==="op"&&this.pk()!.v==="-"){ this.nx(); return(this.T-(this.primary()%this.T))%this.T; }
-    return this.primary();
-  }
-  primary(): number {
-    const t=this.pk(); if(!t) throw new Error("Expected value");
-    if(t.t==="num"){ this.nx(); return parseInt(t.v,10); }
-    if(t.t==="lp"){ this.nx(); const v=this.addSub(); this.ex("rp"); return v; }
-    if(t.t==="fn"){
-      this.nx(); this.ex("lp");
-      if(t.v==="inv"){ const a=this.addSub(); this.ex("rp"); const inv=modInv(a,this.T); if(inv===null) throw new Error(`inv(${a}) undefined mod ${this.T}`); return inv; }
-      if(t.v==="gcd"){ const a=this.addSub(); this.ex("comma"); const b=this.addSub(); this.ex("rp"); return gcd(a,b); }
-      throw new Error(`Unknown fn '${t.v}'`);
-    }
-    throw new Error(`Unexpected '${t.v}'`);
-  }
-}
-
-function evaluate(expr: string, T: number): { result: number } | { error: string } {
-  try { return { result: new Parser(tokenize(expr), T).parse() }; }
-  catch(e) { return { error: (e as Error).message }; }
-}
+import { evaluate, gcd, timeAgo as ago } from "@crypto/modcalc-core";
 
 // ─── History ─────────────────────────────────────────────────────────
 interface HEntry { id: string; expr: string; T: number; result: number; error?: string; ts: number }
 const HKEY = "modcalc_v1";
 function loadH(): HEntry[] { try { return JSON.parse(localStorage.getItem(HKEY)||"[]"); } catch { return []; } }
 function saveH(h: HEntry[]) { try { localStorage.setItem(HKEY,JSON.stringify(h.slice(0,60))); } catch{} }
-function ago(ts: number): string {
-  const d=Date.now()-ts;
-  if(d<60000) return "just now";
-  if(d<3600000) return `${Math.floor(d/60000)}m ago`;
-  if(d<86400000) return `${Math.floor(d/3600000)}h ago`;
-  return `${Math.floor(d/86400000)}d ago`;
-}
+
 
 // ─── Button Layout ───────────────────────────────────────────────────
 type BK = "num"|"op"|"fn"|"eq"|"clr"|"del"|"mem"|"spec";
@@ -139,12 +16,12 @@ interface Btn { label: string; insert?: string; action?: string; kind: BK; span?
 
 const ROWS: Btn[][] = [
   [{ label:"gcd(", insert:"gcd(",  kind:"fn" },{ label:"inv(", insert:"inv(",  kind:"fn" },{ label:"^",    insert:"^",     kind:"op" },{ label:"mod",  insert:" mod ", kind:"op" }],
-  [{ label:"(",    insert:"(",     kind:"fn" },{ label:")",    insert:")",     kind:"fn" },{ label:"+/−",  action:"neg",   kind:"spec" },{ label:"C",    action:"clear", kind:"clr" }],
+  [{ label:"(",    insert:"(",     kind:"fn" },{ label:")",    insert:")",     kind:"fn" },{ label:",",    insert:",",     kind:"fn" },{ label:"C",    action:"clear", kind:"clr" }],
   [{ label:"MC",   action:"mc",    kind:"mem"},{ label:"MR",   action:"mr",    kind:"mem"},{ label:"M+",   action:"mplus", kind:"mem"},{ label:"M−",   action:"mminus",kind:"mem"}],
   [{ label:"7", insert:"7",kind:"num"},{ label:"8",insert:"8",kind:"num"},{ label:"9",insert:"9",kind:"num"},{ label:"÷",insert:" ÷ ",kind:"op"}],
   [{ label:"4", insert:"4",kind:"num"},{ label:"5",insert:"5",kind:"num"},{ label:"6",insert:"6",kind:"num"},{ label:"×",insert:" × ",kind:"op"}],
   [{ label:"1", insert:"1",kind:"num"},{ label:"2",insert:"2",kind:"num"},{ label:"3",insert:"3",kind:"num"},{ label:"−",insert:" − ",kind:"op"}],
-  [{ label:"ANS",  action:"ans",   kind:"spec"},{ label:"0",insert:"0",kind:"num"},{ label:"+",insert:" + ",kind:"op"},{ label:"⌫", action:"back",kind:"del"}],
+  [{ label:"+/−",  action:"neg",   kind:"spec"},{ label:"0",insert:"0",kind:"num"},{ label:"+",insert:" + ",kind:"op"},{ label:"⌫", action:"back",kind:"del"}],
   [{ label:"=",    action:"eval",  kind:"eq", span:4 }],
 ];
 
@@ -159,13 +36,15 @@ const BK_STYLE: Record<BK,{bg:string;color:string;hoverBg:string}> = {
   spec: { bg:"#1e1510",  color:"#fbbf24", hoverBg:"#2a1e12" },
 };
 
+const T_PRESETS = [2,7,10,26,27,29,128];
+
 // ─── Component ───────────────────────────────────────────────────────
 export default function ModCalcPage() {
   const [expr,    setExpr]    = useState("");
   const [result,  setResult]  = useState<number|null>(null);
   const [error,   setError]   = useState<string|null>(null);
-  const [modT,    setModT]    = useState(27);
-  const [modInput,setModInput]= useState("27");
+  const [modT,    setModT]    = useState(0);   // 0 = free (no auto-mod)
+  const [modInput,setModInput]= useState("");
   const [mem,     setMem]     = useState(0);
   const [ans,     setAns]     = useState<number|null>(null);
   const [history, setHistory] = useState<HEntry[]>([]);
@@ -198,7 +77,6 @@ export default function ModCalcPage() {
     setTimeout(() => setPressing(null), 120);
 
     if (btn.insert !== undefined) {
-      // if we just evaluated, start fresh unless it's an op
       if (result !== null && !btn.insert.trim().match(/^[+\-×÷*\/^]/)) {
         setExpr(btn.insert); setResult(null); setError(null); return;
       }
@@ -209,18 +87,21 @@ export default function ModCalcPage() {
     if (btn.action === "clear")  { setExpr(""); setResult(null); setError(null); return; }
     if (btn.action === "back")   { setResult(null); setError(null); setExpr(p => p.trimEnd().replace(/\S+\s*$|.$/, m => m.length>1 ? m.slice(0,-1) : "")); return; }
     if (btn.action === "eval")   { runEval(); return; }
-    if (btn.action === "neg")    { 
-      if (result !== null) { const v=(modT-result)%modT; setResult(v); setAns(v); return; }
-      setExpr(p => p ? `(${modT} − (${p}))` : ""); return; 
+    if (btn.action === "neg") {
+      if (result !== null) {
+        const v = modT > 0 ? (modT - result) % modT : -result;
+        setResult(v); setAns(v); return;
+      }
+      setExpr(p => p ? `(0 − (${p}))` : ""); return;
     }
-    if (btn.action === "ans")    { 
+    if (btn.action === "ans") {
       if (ans !== null) { setExpr(p => result !== null ? String(ans) : p + String(ans)); setResult(null); setError(null); }
-      return; 
+      return;
     }
     if (btn.action === "mc")     { setMem(0); return; }
     if (btn.action === "mr")     { setExpr(p => result!==null ? String(mem) : p+String(mem)); setResult(null); setError(null); return; }
-    if (btn.action === "mplus")  { setMem(m => result!==null ? (m+result)%modT : m); return; }
-    if (btn.action === "mminus") { setMem(m => result!==null ? ((m-result)%modT+modT)%modT : m); return; }
+    if (btn.action === "mplus")  { setMem(m => result!==null ? (modT>0 ? (m+result)%modT : m+result) : m); return; }
+    if (btn.action === "mminus") { setMem(m => result!==null ? (modT>0 ? ((m-result)%modT+modT)%modT : m-result) : m); return; }
   }, [result, ans, mem, modT, runEval]);
 
   // Keyboard support
@@ -237,9 +118,11 @@ export default function ModCalcPage() {
   }, [runEval]);
 
   const commitModT = useCallback(() => {
-    const v = parseInt(modInput, 10);
+    const raw = modInput.trim();
+    if (raw === "" || raw === "∞") { setModT(0); setModInput(""); return; }
+    const v = parseInt(raw, 10);
     if (!isNaN(v) && v >= 2) setModT(v);
-    else setModInput(String(modT));
+    else setModInput(modT > 0 ? String(modT) : "");
   }, [modInput, modT]);
 
   const restoreHistory = (h: HEntry) => {
@@ -247,12 +130,13 @@ export default function ModCalcPage() {
     setResult(null);
     setError(null);
     setModT(h.T);
-    setModInput(String(h.T));
+    setModInput(h.T === 0 ? "" : String(h.T));
     setShowHist(false);
   };
 
   const displayExpr = result !== null ? expr : expr || "0";
   const displayResult = result !== null ? String(result) : null;
+  const isFree = modT === 0;
 
   return (
     <div style={{ minHeight:"100vh", background:"var(--bg-base)", display:"flex", flexDirection:"column" }}>
@@ -293,7 +177,11 @@ export default function ModCalcPage() {
               {/* Modulus T selector */}
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                 <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-                  {[2,7,10,26,27,29,128].map(t => (
+                  {/* Free mode */}
+                  <button onClick={() => { setModT(0); setModInput(""); }}
+                    style={{ fontSize:10,fontFamily:"monospace",padding:"2px 8px",borderRadius:99,border:`1px solid ${isFree?"var(--accent-cyan)":"var(--border-subtle)"}`,background:isFree?"rgba(6,182,212,0.12)":"transparent",color:isFree?"var(--accent-cyan)":"var(--text-muted)",cursor:"pointer",transition:"all .1s",fontWeight:isFree?700:400 }}
+                  >∞ free</button>
+                  {T_PRESETS.map(t => (
                     <button key={t} onClick={() => { setModT(t); setModInput(String(t)); }}
                       style={{ fontSize:10,fontFamily:"monospace",padding:"2px 7px",borderRadius:99,border:`1px solid ${modT===t?"var(--accent-lime)":"var(--border-subtle)"}`,background:modT===t?"rgba(163,230,53,0.1)":"transparent",color:modT===t?"var(--accent-lime)":"var(--text-muted)",cursor:"pointer",transition:"all .1s" }}
                     >T={t}</button>
@@ -303,13 +191,21 @@ export default function ModCalcPage() {
                   <span style={{ fontSize:10, color:"var(--text-muted)" }}>mod</span>
                   <input
                     id="mod-t-input"
-                    type="number" min={2} value={modInput}
+                    type="text" value={modInput}
                     onChange={e => setModInput(e.target.value)}
                     onBlur={commitModT}
                     onKeyDown={e => e.key==="Enter" && commitModT()}
-                    style={{ width:56,textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:700,background:"transparent",border:"1px solid var(--border-mid)",borderRadius:6,color:"var(--accent-lime)",padding:"3px 6px",outline:"none" }}
+                    placeholder="∞"
+                    style={{ width:52,textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:700,background:"transparent",border:`1px solid ${isFree?"var(--accent-cyan)":"var(--border-mid)"}`,borderRadius:6,color:isFree?"var(--accent-cyan)":"var(--accent-lime)",padding:"3px 6px",outline:"none" }}
                   />
                 </div>
+              </div>
+
+              {/* Mode label */}
+              <div style={{ textAlign:"right", marginBottom:2 }}>
+                <span style={{ fontSize:9,fontFamily:"monospace",color:isFree?"var(--accent-cyan)":"var(--accent-lime)",letterSpacing:1 }}>
+                  {isFree ? "FREE  (no auto-mod)" : `AUTO MOD ${modT}`}
+                </span>
               </div>
 
               {/* Expression line */}
@@ -414,7 +310,7 @@ export default function ModCalcPage() {
                         : <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:15, fontWeight:700, color:"var(--accent-cyan)" }}>{h.result}</span>
                       }
                       <div style={{ textAlign:"right" }}>
-                        <div style={{ fontSize:9, color:"var(--accent-lime)", fontFamily:"monospace" }}>mod {h.T}</div>
+                        <div style={{ fontSize:9, color:h.T===0?"var(--accent-cyan)":"var(--accent-lime)", fontFamily:"monospace" }}>{h.T===0?"free":`mod ${h.T}`}</div>
                         <div style={{ fontSize:9, color:"var(--text-muted)" }}>{ago(h.ts)}</div>
                       </div>
                     </div>
@@ -425,7 +321,7 @@ export default function ModCalcPage() {
           )}
         </div>
 
-        {/* HISTORY: mobile inline (when showHist and small screen, already handled by CSS) */}
+        {/* HISTORY: mobile inline */}
         {showHist && (
           <div className="hist-mobile" style={{ display:"none" }}>
             <div style={{ background:"var(--bg-panel)", border:"1px solid var(--border-subtle)", borderRadius:14, overflow:"hidden" }}>
@@ -443,7 +339,7 @@ export default function ModCalcPage() {
                       {h.error ? <span style={{ fontSize:11,color:"var(--accent-rose)" }}>Error</span>
                         : <span style={{ fontFamily:"monospace",fontSize:15,fontWeight:700,color:"var(--accent-cyan)" }}>{h.result}</span>}
                       <div style={{ textAlign:"right" }}>
-                        <div style={{ fontSize:9,color:"var(--accent-lime)",fontFamily:"monospace" }}>mod {h.T}</div>
+                        <div style={{ fontSize:9,color:h.T===0?"var(--accent-cyan)":"var(--accent-lime)",fontFamily:"monospace" }}>{h.T===0?"free":`mod ${h.T}`}</div>
                         <div style={{ fontSize:9,color:"var(--text-muted)" }}>{ago(h.ts)}</div>
                       </div>
                     </div>
@@ -457,14 +353,16 @@ export default function ModCalcPage() {
         {/* Quick reference */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8 }}>
           {[
-            { fn:"a + b", desc:"Addition mod T" },
-            { fn:"a − b", desc:"Subtraction mod T" },
-            { fn:"a × b", desc:"Multiplication mod T" },
-            { fn:"a ÷ b", desc:"b⁻¹ × a mod T" },
-            { fn:"a ^ b", desc:"Modular exponentiation" },
-            { fn:"a mod b", desc:"Remainder (mod b)" },
-            { fn:"inv(a)", desc:"Modular inverse of a" },
-            { fn:"gcd(a,b)", desc:"Greatest common divisor" },
+            { fn:"a + b", desc: isFree ? "Addition" : "Addition mod T" },
+            { fn:"a − b", desc: isFree ? "Subtraction" : "Subtraction mod T" },
+            { fn:"a × b", desc: isFree ? "Multiplication" : "Multiplication mod T" },
+            { fn:"a ÷ b", desc: isFree ? "Integer division (floor)" : "Modular division — multiplies by the inverse" },
+            { fn:"a ^ b", desc: isFree ? "Exponentiation" : "Modular exponentiation (fast)" },
+            { fn:"a mod b", desc:"Remainder — always plain division remainder, unaffected by T" },
+            { fn:"inv(a)", desc: isFree
+              ? "Modular inverse — needs T set first"
+              : `Finds x so that a×x ≡ 1 (mod ${modT}). Only exists when gcd(a,T)=1` },
+            { fn:"gcd(a, b)", desc:"Greatest common divisor — e.g. gcd(24,36)=12. Use the , button between arguments" },
           ].map(r => (
             <div key={r.fn} style={{ background:"var(--bg-card)", border:"1px solid var(--border-subtle)", borderRadius:8, padding:"8px 10px" }}>
               <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--accent-purple)", marginBottom:2 }}>{r.fn}</div>
