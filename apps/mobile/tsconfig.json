@@ -1,6 +1,23 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "jsx": "react-native",
+    "paths": {
+      "@crypto/cipher-core": [
+        "../../packages/cipher-core/src/index.ts"
+      ],
+      "@crypto/cipher-contract": [
+        "../../packages/cipher-contract/src/types.ts"
+      ],
+      "@crypto/modcalc-core": [
+        "../../packages/modcalc-core/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.d.ts"
+  ]
 }
