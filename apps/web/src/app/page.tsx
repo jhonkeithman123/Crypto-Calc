@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { runAlphabetCipher, gcd, modInv } from "@crypto/cipher-core";
 import type { CipherOp, CaseMode, AlphabetCipherResult, ComputeStep } from "@crypto/cipher-core";
 
@@ -165,9 +166,13 @@ export default function CryptoCalcPage() {
           <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Crypto Calc</h1>
           <p style={{ margin: 0, fontSize: 10, color: "var(--text-muted)" }}>Caesar Cipher Playground</p>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
           <span className="chip">Caesar</span>
-          <span className="chip" style={{ display: "none" }}>Substitution</span>
+          <Link href="/modcalc"
+            style={{ fontSize:11,color:"var(--text-muted)",textDecoration:"none",padding:"4px 10px",borderRadius:6,border:"1px solid var(--border-subtle)",background:"var(--bg-card)",transition:"all .15s",whiteSpace:"nowrap" }}
+            onMouseEnter={e=>(e.currentTarget.style.color="var(--accent-cyan)")}
+            onMouseLeave={e=>(e.currentTarget.style.color="var(--text-muted)")}
+          >Mod Calc →</Link>
         </div>
       </header>
 
