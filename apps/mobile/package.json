@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@crypto/cipher-core": "workspace:*",
+    "@crypto/galaxy-elements": "workspace:*",
     "@crypto/modcalc-core": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.15.8",
