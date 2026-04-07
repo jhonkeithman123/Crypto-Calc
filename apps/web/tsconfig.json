@@ -24,7 +24,11 @@
       "@crypto/cipher-contract": [
         "../../packages/cipher-contract/src/types.ts"
       ],
-      "@crypto/galaxy-elements": ["../../packages/galaxy-elements/src/index.ts"]
+      "@crypto/galaxy-elements": [
+        "../../packages/galaxy-elements/src/index.ts"
+      ],
+      "@crypto/patch-notes": ["../../packages/patch-notes/src/index.ts"],
+      "@crypto/patch-notes/client": ["../../packages/patch-notes/src/client.ts"]
     }
   },
   "include": [

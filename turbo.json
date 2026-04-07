@@ -16,6 +16,11 @@
     "start": {
       "persistent": true,
       "cache": false
+    },
+    "android:apk": {
+      "dependsOn": [],
+      "cache": false,
+      "outputs": ["apps/mobile/android/app/build/outputs/**"]
     }
   }
 }

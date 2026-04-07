@@ -9,6 +9,7 @@
   "scripts": {
     "bootstrap": "pnpm install",
     "build": "turbo run build --ui=tui",
+    "build:apk": "turbo run android:apk --filter=mobile",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "dev:web": "turbo run dev --filter=web",

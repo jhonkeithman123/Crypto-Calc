@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import {
+  GestureResponderEvent,
   Modal,
   Pressable,
   StyleSheet,
@@ -31,7 +32,12 @@ export default function App() {
 }
 
 function AppShell() {
+  const insets = useSafeAreaInsets();
   const [showInfo, setShowInfo] = useState(false);
+
+  const swallowBackdropPress = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+  };
 
   return (
     <NavigationContainer>
@@ -41,12 +47,18 @@ function AppShell() {
       <Modal
         transparent
         animationType="fade"
+        statusBarTranslucent
         visible={showInfo}
         onRequestClose={() => setShowInfo(false)}
       >
         <Pressable style={s.backdrop} onPress={() => setShowInfo(false)}>
-          <Pressable style={s.panel} onPress={() => {}}>
-            <View style={s.panelHeader}>
+          <Pressable style={s.panel} onPress={swallowBackdropPress}>
+            <View
+              style={[
+                s.panelHeader,
+                { paddingTop: insets.top + 8, paddingBottom: 8 },
+              ]}
+            >
               <Text style={s.panelTitle}>About & Updates</Text>
               <TouchableOpacity
                 style={s.closeBtn}
@@ -65,7 +77,7 @@ function AppShell() {
 
 function MainTabs({ onOpenInfo }: { onOpenInfo: () => void }) {
   const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, 8);
+  const bottomPad = Math.max(insets.bottom, 14);
 
   return (
     <Tab.Navigator
@@ -91,9 +103,9 @@ function MainTabs({ onOpenInfo }: { onOpenInfo: () => void }) {
         tabBarStyle: {
           backgroundColor: C.bgPanel,
           borderTopColor: "rgba(139,92,246,0.18)",
-          height: 50 + bottomPad,
+          height: 56 + bottomPad,
           paddingBottom: bottomPad,
-          paddingTop: 6,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: "#8b5cf6",
         tabBarInactiveTintColor: "#5a5880",
@@ -153,7 +165,7 @@ const s = StyleSheet.create({
     borderLeftColor: C.border,
   },
   panelHeader: {
-    height: 52,
+    minHeight: 60,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     backgroundColor: C.bgPanel,
