@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import {
+  Alert,
   Animated,
   Linking,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { latestPatchNotesSummary } from "@crypto/patch-notes/client";
 import appJson from "../../app.json";
 import GalaxyParallaxBackground from "../components/GalaxyParallaxBackground";
 import { C, F } from "../theme";
@@ -22,7 +24,7 @@ type ReleaseInfo = {
   version: string;
   url: string;
   publishedAt: string | null;
-  source: "release" | "tag";
+  source: "release" | "tag" | "release-page";
 };
 
 const CREATOR_NAME = "Keith Justine Virgenes";
@@ -61,8 +63,12 @@ function formatDate(iso: string | null): string {
 }
 
 async function fetchLatestVersion(): Promise<ReleaseInfo> {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "Crypto-Calc-Mobile",
+  };
   const releaseUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
-  const releaseRes = await fetch(releaseUrl);
+  const releaseRes = await fetch(releaseUrl, { headers });
 
   if (releaseRes.ok) {
     const data = await releaseRes.json();
@@ -75,9 +81,15 @@ async function fetchLatestVersion(): Promise<ReleaseInfo> {
       source: "release",
     };
   }
+  if (releaseRes.status === 403 || releaseRes.status === 429) {
+    return fetchLatestFromPublicReleasePage();
+  }
 
   const tagsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/tags`;
-  const tagsRes = await fetch(tagsUrl);
+  const tagsRes = await fetch(tagsUrl, { headers });
+  if (tagsRes.status === 403 || tagsRes.status === 429) {
+    return fetchLatestFromPublicReleasePage();
+  }
   if (!tagsRes.ok) {
     throw new Error("Could not fetch release or tags from GitHub.");
   }
@@ -93,6 +105,42 @@ async function fetchLatestVersion(): Promise<ReleaseInfo> {
     publishedAt: null,
     source: "tag",
   };
+}
+
+function parseVersionFromTagUrl(url: string): string | null {
+  const m = url.match(/\/tag\/([^/?#]+)/i);
+  if (!m || !m[1]) return null;
+  return normalizeVersion(decodeURIComponent(m[1]));
+}
+
+async function fetchLatestFromPublicReleasePage(): Promise<ReleaseInfo> {
+  const latestUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+  const releasePageRes = await fetch(latestUrl, { redirect: "follow" });
+  const finalUrl = String(releasePageRes.url || latestUrl);
+
+  const byRedirect = parseVersionFromTagUrl(finalUrl);
+  if (byRedirect) {
+    return {
+      version: byRedirect,
+      url: finalUrl,
+      publishedAt: null,
+      source: "release-page",
+    };
+  }
+
+  const html = await releasePageRes.text();
+  const m = html.match(/\/releases\/tag\/([^"'?#\s<]+)/i);
+  if (m && m[1]) {
+    const rawTag = decodeURIComponent(m[1]);
+    return {
+      version: normalizeVersion(rawTag),
+      url: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/${rawTag}`,
+      publishedAt: null,
+      source: "release-page",
+    };
+  }
+
+  throw new Error("Could not determine latest release from GitHub.");
 }
 
 export default function AppInfoScreen() {
@@ -129,8 +177,11 @@ export default function AppInfoScreen() {
   }, [checkForUpdates]);
 
   const openUrl = useCallback(async (url: string) => {
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) await Linking.openURL(url);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert("Unable to open link", url);
+    }
   }, []);
 
   return (
@@ -180,6 +231,19 @@ export default function AppInfoScreen() {
         </View>
 
         <View style={s.card}>
+          <Text style={s.header}>Latest Patch Notes</Text>
+          <Text style={s.rowLabel}>Version</Text>
+          <Text style={s.rowValue}>{latestPatchNotesSummary.version}</Text>
+          <Text style={s.rowLabel}>Date</Text>
+          <Text style={s.rowValue}>{latestPatchNotesSummary.date}</Text>
+          {latestPatchNotesSummary.highlights.map((item) => (
+            <Text key={item} style={s.bulletText}>
+              - {item}
+            </Text>
+          ))}
+        </View>
+
+        <View style={s.card}>
           <Text style={s.header}>Update Checker</Text>
           <Text style={s.rowLabel}>Status</Text>
           <Text
@@ -195,6 +259,11 @@ export default function AppInfoScreen() {
             <>
               <Text style={s.rowLabel}>Latest Version ({latest.source})</Text>
               <Text style={s.rowValue}>{latest.version}</Text>
+              {latest.source === "release-page" ? (
+                <Text style={s.infoText}>
+                  Using public GitHub page fallback (API rate-limited).
+                </Text>
+              ) : null}
               <Text style={s.rowLabel}>Published</Text>
               <Text style={s.rowValue}>{formatDate(latest.publishedAt)}</Text>
               <TouchableOpacity
@@ -296,5 +365,17 @@ const s = StyleSheet.create({
     color: C.rose,
     fontSize: 12,
     marginTop: 8,
+  },
+  bulletText: {
+    color: C.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  infoText: {
+    color: C.amber,
+    fontSize: 11,
+    marginTop: 4,
+    marginBottom: 4,
   },
 });

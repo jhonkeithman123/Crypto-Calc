@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { latestPatchNotesSummary } from "@crypto/patch-notes/client";
 import GalaxyBackgroundWeb from "../components/GalaxyBackgroundWeb";
 
 const CREATOR_NAME = "Keith Justine Virgenes";
@@ -171,6 +172,37 @@ export default function AboutPage() {
         <section
           className="panel"
           style={{ padding: 14, background: "rgba(19,17,42,0.72)" }}
+        >
+          <div className="section-label">Latest Patch Notes</div>
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "var(--accent-cyan)",
+              fontSize: 14,
+              marginTop: 4,
+            }}
+          >
+            {latestPatchNotesSummary.version} ({latestPatchNotesSummary.date})
+          </div>
+          <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+            {latestPatchNotesSummary.highlights.map((item) => (
+              <div
+                key={item}
+                style={{ color: "var(--text-secondary)", fontSize: 12 }}
+              >
+                - {item}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          className="panel"
+          style={{
+            padding: 14,
+            background: "rgba(19,17,42,0.72)",
+            marginTop: 10,
+          }}
         >
           <div className="section-label">Update Checks</div>
           <div
