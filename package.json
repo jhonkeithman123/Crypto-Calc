@@ -1,7 +1,7 @@
 {
   "name": "crypto-calculator-monorepo",
   "private": true,
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@10.33.0",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -12,8 +12,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "dev:web": "turbo run dev --filter=web",
-    "dev:mobile": "turbo run dev --filter=mobile",
-    "tui": "turbo",
+    "mobile": "turbo run --filter=mobile start",
     "create:web": "npx create-next-app@latest apps/web --typescript",
     "create:mobile": "npx create-expo-app apps/mobile --template expo-template-blank-typescript",
     "create:both": "pnpm run create:web && pnpm run create:mobile",

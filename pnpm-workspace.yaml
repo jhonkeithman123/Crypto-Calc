@@ -7,4 +7,4 @@ ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
 
-nodeLinker: hoisted
+nodeLinker: isolated

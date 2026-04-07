@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@crypto/cipher-core": "workspace:*",
+    "@crypto/galaxy-elements": "workspace:*",
     "@crypto/modcalc-core": "workspace:*",
     "next": "16.2.1",
     "react": "19.2.0",

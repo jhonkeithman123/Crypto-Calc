@@ -21,7 +21,10 @@
     "paths": {
       "@/*": ["./src/*"],
       "@crypto/cipher-core": ["../../packages/cipher-core/src/index.ts"],
-      "@crypto/cipher-contract": ["../../packages/cipher-contract/src/types.ts"]
+      "@crypto/cipher-contract": [
+        "../../packages/cipher-contract/src/types.ts"
+      ],
+      "@crypto/galaxy-elements": ["../../packages/galaxy-elements/src/index.ts"]
     }
   },
   "include": [

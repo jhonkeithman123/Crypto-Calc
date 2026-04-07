@@ -3,21 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-native",
+    "moduleResolution": "bundler",
     "paths": {
-      "@crypto/cipher-core": [
-        "../../packages/cipher-core/src/index.ts"
-      ],
+      "@crypto/cipher-core": ["../../packages/cipher-core/src/index.ts"],
       "@crypto/cipher-contract": [
         "../../packages/cipher-contract/src/types.ts"
       ],
-      "@crypto/modcalc-core": [
-        "../../packages/modcalc-core/src/index.ts"
-      ]
+      "@crypto/modcalc-core": ["../../packages/modcalc-core/src/index.ts"],
+      "@crypto/galaxy-elements": ["../../packages/galaxy-elements/src/index.ts"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.d.ts"]
 }
